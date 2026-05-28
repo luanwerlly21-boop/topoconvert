@@ -590,7 +590,7 @@ async function exportar() {
   S.nomeProjeto = document.getElementById('exp-nome')?.value || S.nomeProjeto;
 
   const fd = new FormData();
-  fd.append('texto', await getTexto());
+  fd.append('texto', _textoCache);
   fd.append('nome_projeto', S.nomeProjeto);
   fd.append('email', S.email);
   fd.append('mapeamento', JSON.stringify(S.mapeamento));
@@ -618,23 +618,33 @@ async function exportar() {
   }
 }
 
-// Texto em memória (foi detectado via API)
+// Texto em memória
 let _textoCache = '';
-async function getTexto() {
-  return _textoCache;
-}
 
-// Override: guarda texto antes de detectar
-const _origEnviar = enviarArquivo;
-window.enviarArquivo = async function(file) {
+async function enviarArquivo(file) {
+  S.nomeArq = file.name;
+  S.nomeProjeto = document.getElementById('nome-proj')?.value || S.nomeProjeto;
+  mostrarLoading('Analisando arquivo...');
+
+  // Guarda texto em cache para usar no exportar
   const raw = await file.arrayBuffer();
   const bytes = new Uint8Array(raw);
   try { _textoCache = new TextDecoder('utf-8').decode(bytes); }
   catch { _textoCache = new TextDecoder('latin-1').decode(bytes); }
-  return _origEnviar(file);
-};
 
-window.analisarPaste = async function() {
+  const fd = new FormData();
+  fd.append('arquivo', file);
+  try {
+    const res = await fetch('/api/detectar', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.erro) { mostrarErro(data.erro); return; }
+    aplicarDeteccao(data);
+  } catch(e) {
+    mostrarErro('Erro de conexão com o servidor.');
+  }
+}
+
+async function analisarPaste() {
   _textoCache = document.getElementById('paste-ta')?.value.trim() || '';
   S.nomeProjeto = document.getElementById('nome-proj')?.value || S.nomeProjeto;
   S.nomeArq = 'dados_colados.csv';
@@ -648,7 +658,7 @@ window.analisarPaste = async function() {
     if (data.erro) { mostrarErro(data.erro); return; }
     aplicarDeteccao(data);
   } catch(e) { mostrarErro('Erro de conexão.'); }
-};
+}
 
 // ─────────────────────────────────────────
 // STEP 3 — PRONTO + FEEDBACK
