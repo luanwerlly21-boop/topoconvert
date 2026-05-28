@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TopoConvert — Conversor topográfico para Civil 3D</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Figtree:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e1114;--s1:#161b21;--s2:#1d2530;--s3:#242e3a;
+  --border:#2a3444;--b2:#35404f;
+  --green:#00d492;--gdim:#003d2a;--glight:rgba(0,212,146,.08);
+  --amber:#f59e0b;--adim:#3d2800;--alight:rgba(245,158,11,.08);
+  --red:#f87171;--rlight:rgba(248,113,113,.1);
+  --text:#dde3eb;--muted:#6b7a8d;--dim:#3d4d5e;
+  --mono:'DM Mono',monospace;--sans:'Figtree',sans-serif;--disp:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;font-size:14px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:52px 52px;opacity:.18;pointer-events:none;z-index:0;}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:rgba(14,17,20,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);}
+.logo{font-family:var(--disp);font-weight:800;font-size:16px;display:flex;align-items:center;gap:8px;}
+.logo-mark{width:24px;height:24px;background:var(--green);border-radius:5px;display:flex;align-items:center;justify-content:center;}
+.logo-mark svg{width:13px;height:13px;}
+.beta-badge{font-family:var(--mono);font-size:10px;background:var(--alight);border:1px solid var(--adim);color:var(--amber);padding:3px 10px;border-radius:10px;}
+.nav-r{display:flex;align-items:center;gap:10px;}
+
+/* STEP TRAIL */
+.step-trail{display:flex;align-items:center;gap:4px;padding:12px 28px;border-bottom:1px solid var(--border);position:relative;z-index:1;}
+.st{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);padding:5px 10px;border-radius:20px;cursor:pointer;transition:all .2s;}
+.st.active{color:var(--text);background:var(--s2);}
+.st.done{color:var(--green);}
+.st-n{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;background:var(--s1);transition:all .2s;flex-shrink:0;}
+.st.active .st-n{border-color:var(--green);color:var(--green);}
+.st.done .st-n{background:var(--green);border-color:var(--green);color:#000;}
+.st-arr{color:var(--dim);font-size:11px;}
+
+/* WRAPPER */
+.wrap{position:relative;z-index:1;max-width:820px;margin:0 auto;padding:32px 24px 60px;}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:28px;margin-bottom:20px;}
+.card-title{font-family:var(--disp);font-size:17px;font-weight:700;letter-spacing:-.4px;margin-bottom:4px;}
+.card-sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
+
+/* UPLOAD ZONE */
+.uz{border:1.5px dashed var(--border);border-radius:12px;padding:40px 24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;margin-bottom:16px;}
+.uz:hover,.uz.over{border-color:var(--green);background:var(--glight);}
+.uz input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:2;width:100%;height:100%;}
+.uz-ico{width:44px;height:44px;margin:0 auto 12px;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;transition:transform .3s;}
+.uz:hover .uz-ico{transform:translateY(-2px);}
+.uz-title{font-family:var(--disp);font-size:15px;font-weight:700;margin-bottom:4px;}
+.uz-sub{font-size:12px;color:var(--muted);}
+.uz-tags{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:12px;}
+.uz-tag{font-family:var(--mono);font-size:10px;background:var(--s2);border:1px solid var(--border);color:var(--dim);padding:2px 8px;border-radius:3px;}
+.uz.selected{border-color:var(--green);border-style:solid;background:var(--glight);}
+.uz.selected .uz-title{color:var(--green);}
+
+/* PASTE */
+.paste-box{background:var(--s2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;}
+.pb-hdr{padding:7px 14px;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.pb-link{font-size:11px;color:var(--green);background:none;border:none;cursor:pointer;font-family:var(--sans);}
+textarea.pb-ta{width:100%;padding:10px 14px;background:transparent;border:none;font-family:var(--mono);font-size:11px;color:var(--text);resize:vertical;min-height:72px;outline:none;line-height:1.6;}
+.pb-go{width:100%;padding:9px;background:var(--s3);color:var(--text);border:none;border-top:1px solid var(--border);font-family:var(--disp);font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;}
+.pb-go:hover{background:var(--b2);}
+
+/* MAPEADOR */
+.banner{display:flex;align-items:center;gap:8px;border-radius:8px;padding:9px 12px;margin-bottom:14px;font-size:12px;}
+.banner svg{width:14px;height:14px;flex-shrink:0;}
+.b-ok{background:var(--glight);border:1px solid var(--gdim);color:var(--green);}
+.b-warn{background:var(--alight);border:1px solid var(--adim);color:var(--amber);}
+.b-err{background:var(--rlight);border:1px solid rgba(248,113,113,.3);color:var(--red);}
+
+.field-leg{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;}
+.fl{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:12px;font-size:11px;}
+.fl-p{background:rgba(0,212,146,.12);border:1px solid var(--gdim);color:var(--green);}
+.fl-n{background:rgba(59,158,255,.08);border:1px solid rgba(59,158,255,.2);color:#3b9eff;}
+.fl-l{background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:#a78bfa;}
+.fl-c{background:var(--alight);border:1px solid var(--adim);color:var(--amber);}
+.fl-dot{width:6px;height:6px;border-radius:50%;}
+
+.tbl-wrap{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;}
+.tbl-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--s2);}
+th{padding:0;border-right:1px solid var(--border);min-width:100px;vertical-align:top;}
+th:last-child{border-right:none;}
+.th-in{padding:8px 10px 7px;}
+.th-raw{font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.col-sel{width:100%;background:var(--s3);border:1px solid var(--border);border-radius:5px;font-family:var(--sans);font-size:10px;color:var(--text);padding:3px 5px;appearance:none;cursor:pointer;transition:border-color .15s;}
+.col-sel:focus{outline:none;}
+.cs-ponto{border-color:var(--green)!important;background:rgba(0,212,146,.1)!important;color:var(--green)!important;}
+.cs-norte{border-color:#3b9eff!important;background:rgba(59,158,255,.08)!important;color:#3b9eff!important;}
+.cs-leste{border-color:#a78bfa!important;background:rgba(167,139,250,.08)!important;color:#a78bfa!important;}
+.cs-cota{border-color:var(--amber)!important;background:var(--alight)!important;color:var(--amber)!important;}
+.cs-ignore{background:var(--s2)!important;color:var(--dim)!important;}
+td{padding:6px 10px;border-right:1px solid var(--border);border-bottom:1px solid var(--s2);font-family:var(--mono);font-size:11px;color:var(--text);white-space:nowrap;}
+td:last-child{border-right:none;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--s2);}
+.hl-ponto{background:rgba(0,212,146,.06)!important;}
+.hl-norte{background:rgba(59,158,255,.06)!important;}
+.hl-leste{background:rgba(167,139,250,.06)!important;}
+.hl-cota{background:var(--alight)!important;}
+
+/* PREVIEW CSV */
+.prev-csv{background:var(--s2);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:11px;line-height:1.7;max-height:100px;overflow-y:auto;margin-bottom:16px;}
+.prev-head{color:var(--dim);margin-bottom:3px;}
+.prev-row{color:var(--text);}
+
+/* CONFIG GRID */
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.cfg{display:flex;flex-direction:column;gap:5px;}
+.cfg-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.cfg-sel,.cfg-inp{background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--sans);font-size:12px;padding:8px 10px;appearance:none;transition:border-color .2s;width:100%;}
+.cfg-sel:focus,.cfg-inp:focus{outline:none;border-color:var(--green);}
+
+/* EMAIL GATE */
+.email-gate{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px;}
+.eg-title{font-family:var(--disp);font-size:15px;font-weight:700;margin-bottom:4px;}
+.eg-sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.eg-row{display:flex;gap:8px;}
+.eg-inp{flex:1;background:var(--s3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--sans);font-size:13px;padding:9px 12px;transition:border-color .2s;}
+.eg-inp:focus{outline:none;border-color:var(--green);}
+.eg-inp.error{border-color:var(--red);}
+
+/* BOTÕES */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:none;border-radius:9px;font-family:var(--disp);font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:-.3px;width:100%;}
+.btn svg{width:16px;height:16px;flex-shrink:0;}
+.btn-green{background:var(--green);color:#000;}
+.btn-green:hover{background:#00f0a8;}
+.btn-green:disabled{opacity:.35;cursor:default;}
+.btn-dark{background:var(--s3);color:var(--text);border:1px solid var(--border);}
+.btn-dark:hover{background:var(--b2);}
+.btn-sm{padding:7px 14px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--sans);}
+.btn-sm:hover{background:var(--s2);color:var(--text);}
+
+/* RESULTADO */
+.result-files{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+.rf{display:flex;align-items:center;gap:10px;background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:12px;}
+.rf-badge{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;font-weight:500;flex-shrink:0;}
+.bx{background:rgba(0,212,146,.15);color:var(--green);}
+.by{background:rgba(245,158,11,.15);color:var(--amber);}
+.bc{background:rgba(59,158,255,.15);color:#3b9eff;}
+.rf-name{font-family:var(--mono);font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rf-desc{font-size:11px;color:var(--muted);}
+.rf-stat{font-family:var(--mono);font-size:10px;color:var(--dim);}
+
+/* FEEDBACK */
+.stars{display:flex;gap:6px;margin-bottom:12px;}
+.star{font-size:24px;cursor:pointer;opacity:.3;transition:opacity .15s;line-height:1;}
+.star.on{opacity:1;}
+.fb-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+textarea.fb-ta{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--sans);font-size:12px;padding:8px 10px;resize:vertical;min-height:64px;outline:none;margin-bottom:12px;}
+textarea.fb-ta:focus{border-color:var(--green);}
+
+/* LOADING */
+.loader{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;}
+.spin{animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .3s ease both;}
+
+/* MOBILE */
+@media(max-width:600px){
+  .cfg-grid{grid-template-columns:1fr;}
+  .fb-grid{grid-template-columns:1fr;}
+  .wrap{padding:20px 16px 48px;}
+  nav{padding:12px 16px;}
+  .eg-row{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 13 13" fill="none" stroke="black" stroke-width="2.2" stroke-linecap="round"><path d="M1 9L4 6l3 3 5-7"/></svg>
+    </div>
+    TopoConvert
+  </div>
+  <span class="beta-badge">beta</span>
+  <div class="nav-r">
+    <button class="btn-sm" onclick="irStep(0)">Nova conversão</button>
+  </div>
+</nav>
+
+<!-- STEPS -->
+<div class="step-trail">
+  <div class="st active" id="st0" onclick="irStep(0)"><div class="st-n">1</div>Carregar</div>
+  <div class="st-arr">›</div>
+  <div class="st" id="st1"><div class="st-n">2</div>Mapear colunas</div>
+  <div class="st-arr">›</div>
+  <div class="st" id="st2"><div class="st-n">3</div>Exportar</div>
+  <div class="st-arr">›</div>
+  <div class="st" id="st3"><div class="st-n">4</div>Pronto</div>
+</div>
+
+<div class="wrap" id="wrap"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════════════
+const S = {
+  step: 0,
+  texto: '',
+  nomeArq: '',
+  nomeProjeto: 'Projeto',
+  cabecalho: [],
+  amostra: [],
+  mapeamento: {},
+  totalLinhas: 0,
+  email: '',
+  nota: 0,
+  nPontos: 0,
+};
+
+// ═══════════════════════════════════════════
+// RENDER POR STEP
+// ═══════════════════════════════════════════
+function render() {
+  [0,1,2,3].forEach(i => {
+    const el = document.getElementById('st'+i);
+    el.className = 'st' + (i < S.step ? ' done' : i === S.step ? ' active' : '');
+  });
+  const wrap = document.getElementById('wrap');
+  wrap.className = 'wrap fade-up';
+  if (S.step === 0) wrap.innerHTML = renderUpload();
+  if (S.step === 1) wrap.innerHTML = renderMapeador();
+  if (S.step === 2) wrap.innerHTML = renderExportar();
+  if (S.step === 3) wrap.innerHTML = renderPronto();
+  bindStep();
+}
+
+function irStep(n) {
+  if (n > S.step) return;
+  S.step = n; render();
+}
+
+// ─────────────────────────────────────────
+// STEP 0 — CARREGAR
+// ─────────────────────────────────────────
+function renderUpload() {
+  return `
+  <div class="card">
+    <div class="card-title">Carregar arquivo</div>
+    <div class="card-sub">Qualquer formato de campo — detecção automática de colunas</div>
+
+    <label class="uz" id="uz" for="fi">
+      <input type="file" id="fi" accept=".csv,.txt,.asc,.xyz,.xml,.landxml">
+      <div class="uz-ico">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-linecap="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="uz-title" id="uz-title">Arraste o arquivo aqui</div>
+      <div class="uz-sub">ou toque para selecionar · CSV, TXT, ASC, LandXML</div>
+      <div class="uz-tags">
+        <span class="uz-tag">Leica</span><span class="uz-tag">Trimble</span>
+        <span class="uz-tag">Topcon</span><span class="uz-tag">GNSS RTK</span>
+        <span class="uz-tag">LandXML</span>
+      </div>
+    </label>
+
+    <div class="paste-box">
+      <div class="pb-hdr">
+        Ou cole os dados diretamente
+        <button class="pb-link" onclick="colarExemplo()">↓ Exemplo com colunas bagunçadas</button>
+      </div>
+      <textarea class="pb-ta" id="paste-ta" placeholder="Cole aqui o conteúdo do arquivo...
+Ex: 612345.23;850.12;7245123.45;1;TP"></textarea>
+      <button class="pb-go" onclick="analisarPaste()">Analisar dados →</button>
+    </div>
+
+    <div class="cfg-grid">
+      <div class="cfg">
+        <span class="cfg-lbl">Nome do projeto</span>
+        <input class="cfg-inp" id="nome-proj" type="text" placeholder="Loteamento Bela Vista" value="${S.nomeProjeto}">
+      </div>
+      <div class="cfg">
+        <span class="cfg-lbl">Sistema de coordenadas</span>
+        <select class="cfg-sel">
+          <option>SIRGAS 2000 (padrão BR)</option>
+          <option>SAD 69</option><option>WGS 84</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="upload-msg"></div>
+  </div>`;
+}
+
+function bindStep() {
+  if (S.step === 0) {
+    const fi = document.getElementById('fi');
+    if (fi) fi.addEventListener('change', () => { if (fi.files[0]) enviarArquivo(fi.files[0]); });
+    const uz = document.getElementById('uz');
+    if (uz) {
+      uz.addEventListener('dragover', e => { e.preventDefault(); uz.classList.add('over'); });
+      uz.addEventListener('dragleave', () => uz.classList.remove('over'));
+      uz.addEventListener('drop', e => {
+        e.preventDefault(); uz.classList.remove('over');
+        if (e.dataTransfer.files[0]) enviarArquivo(e.dataTransfer.files[0]);
+      });
+    }
+    const ni = document.getElementById('nome-proj');
+    if (ni) ni.addEventListener('input', () => S.nomeProjeto = ni.value);
+  }
+  if (S.step === 1) {
+    // selects de mapeamento já têm onchange inline
+  }
+  if (S.step === 3) {
+    // stars de feedback
+    document.querySelectorAll('.star').forEach(s => {
+      s.addEventListener('click', () => {
+        S.nota = parseInt(s.dataset.v);
+        document.querySelectorAll('.star').forEach(x => x.classList.toggle('on', parseInt(x.dataset.v) <= S.nota));
+      });
+    });
+  }
+}
+
+// ─────────────────────────────────────────
+// ENVIAR PARA DETECÇÃO
+// ─────────────────────────────────────────
+async function enviarArquivo(file) {
+  S.nomeArq = file.name;
+  S.nomeProjeto = document.getElementById('nome-proj')?.value || S.nomeProjeto;
+  mostrarLoading('Analisando arquivo...');
+
+  const fd = new FormData();
+  fd.append('arquivo', file);
+
+  try {
+    const res = await fetch('/api/detectar', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.erro) { mostrarErro(data.erro); return; }
+    aplicarDeteccao(data);
+  } catch(e) {
+    mostrarErro('Erro de conexão com o servidor.');
+  }
+}
+
+async function analisarPaste() {
+  const txt = document.getElementById('paste-ta')?.value.trim();
+  if (!txt) return;
+  S.nomeProjeto = document.getElementById('nome-proj')?.value || S.nomeProjeto;
+  S.nomeArq = 'dados_colados.csv';
+  mostrarLoading('Analisando...');
+
+  const fd = new FormData();
+  fd.append('texto', txt);
+
+  try {
+    const res = await fetch('/api/detectar', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.erro) { mostrarErro(data.erro); return; }
+    aplicarDeteccao(data);
+  } catch(e) {
+    mostrarErro('Erro de conexão.');
+  }
+}
+
+function aplicarDeteccao(data) {
+  S.cabecalho   = data.cabecalho;
+  S.amostra     = data.amostra;
+  S.mapeamento  = data.mapeamento;
+  S.totalLinhas = data.total_linhas;
+  S.step = 1;
+  render();
+}
+
+function mostrarLoading(msg) {
+  const el = document.getElementById('upload-msg');
+  if (el) el.innerHTML = `<div class="loader"><span class="spin">⟳</span>${msg}</div>`;
+}
+
+function mostrarErro(msg) {
+  const el = document.getElementById('upload-msg');
+  if (el) el.innerHTML = `<div class="banner b-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>${msg}</div>`;
+}
+
+function colarExemplo() {
+  const ta = document.getElementById('paste-ta');
+  if (ta) ta.value = `612345.234;850.120;7245123.456;1;TP
+612346.891;851.340;7245124.678;2;PC
+612348.123;852.100;7245125.901;3;PT
+612350.456;853.220;7245127.234;4;TP
+612352.789;854.110;7245129.567;5;BM
+612355.012;855.030;7245131.890;6;PC
+612358.234;856.220;7245134.123;7;PT
+612361.456;857.110;7245137.456;8;TP
+612364.678;858.220;7245140.789;9;BM
+612367.900;859.110;7245144.012;10;PC`;
+}
+
+// ─────────────────────────────────────────
+// STEP 1 — MAPEADOR
+// ─────────────────────────────────────────
+function renderMapeador() {
+  const ok = ['ponto','norte','leste','cota'].every(f => Object.values(S.mapeamento).includes(f));
+  const nc = S.cabecalho.length;
+
+  // Tabela
+  let thead = '<thead><tr>';
+  for (let c = 0; c < nc; c++) {
+    const cam = S.mapeamento[c] || 'ignore';
+    const cls = cam !== 'ignore' ? `cs-${cam}` : 'cs-ignore';
+    const opts = ['ponto','norte','leste','cota','desc','ignore'].map(f =>
+      `<option value="${f}" ${cam===f?'selected':''}>${{ponto:'Ponto/ID',norte:'Norte (Y)',leste:'Leste (X)',cota:'Cota (Z)',desc:'Descrição',ignore:'Ignorar'}[f]}</option>`
+    ).join('');
+    thead += `<th><div class="th-in"><div class="th-raw">${S.cabecalho[c]||'Col '+(c+1)}</div>
+      <select class="col-sel ${cls}" onchange="trocarCampo(${c},this.value)">${opts}</select></div></th>`;
+  }
+  thead += '</tr></thead>';
+
+  let tbody = '<tbody>';
+  S.amostra.forEach(row => {
+    tbody += '<tr>';
+    for (let c = 0; c < nc; c++) {
+      const cam = S.mapeamento[c] || 'ignore';
+      const hl = cam !== 'ignore' ? `hl-${cam}` : '';
+      tbody += `<td class="${hl}">${row[c] ?? ''}</td>`;
+    }
+    tbody += '</tr>';
+  });
+  if (S.totalLinhas > S.amostra.length)
+    tbody += `<tr><td colspan="${nc}" style="text-align:center;color:var(--dim);font-size:10px;padding:8px;">… mais ${S.totalLinhas - S.amostra.length} linhas</td></tr>`;
+  tbody += '</tbody>';
+
+  // Prévia
+  let prev = `<div class="prev-head">Ponto,Norte,Leste,Cota,Desc</div>`;
+  const gi = f => { const e = Object.entries(S.mapeamento).find(([,v])=>v===f); return e?parseInt(e[0]):null; };
+  S.amostra.slice(0,4).forEach(row => {
+    const p=row[gi('ponto')]||'', n=row[gi('norte')]||'', e=row[gi('leste')]||'';
+    const z=row[gi('cota')]||'',  d=gi('desc')!==null?(row[gi('desc')]||''):'';
+    prev += `<div class="prev-row">${p},${n},${e},${z},${d}</div>`;
+  });
+
+  return `
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <h2 style="font-family:var(--disp);font-size:20px;font-weight:800;letter-spacing:-.6px;">Mapear colunas</h2>
+      <p style="font-size:12px;color:var(--muted);margin-top:3px;">${S.totalLinhas} pontos · ${nc} colunas · use os selects para corrigir</p>
+    </div>
+    <button class="btn-sm" onclick="irStep(0)">← Voltar</button>
+  </div>
+
+  <div class="banner ${ok?'b-ok':'b-warn'}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      ${ok?'<polyline points="20 6 9 17 4 12"/>':'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>'}
+    </svg>
+    ${ok
+      ? '<strong>Colunas detectadas automaticamente</strong> — confirme ou ajuste abaixo.'
+      : '<strong>Ajuste manual necessário</strong> — selecione qual coluna é cada campo.'}
+  </div>
+
+  <div class="field-leg">
+    <div class="fl fl-p"><div class="fl-dot" style="background:var(--green)"></div>Ponto/ID</div>
+    <div class="fl fl-n"><div class="fl-dot" style="background:#3b9eff"></div>Norte</div>
+    <div class="fl fl-l"><div class="fl-dot" style="background:#a78bfa"></div>Leste</div>
+    <div class="fl fl-c"><div class="fl-dot" style="background:var(--amber)"></div>Cota</div>
+  </div>
+
+  <div class="tbl-wrap"><div class="tbl-scroll"><table>${thead}${tbody}</table></div></div>
+
+  <div class="card-title" style="font-size:13px;margin-bottom:8px;">Prévia do resultado</div>
+  <div class="prev-csv">${prev}</div>
+
+  <div class="cfg-grid">
+    <div class="cfg">
+      <span class="cfg-lbl">Separador de saída</span>
+      <select class="cfg-sel" id="sep-out">
+        <option value=",">Vírgula (Civil 3D padrão)</option>
+        <option value=";">Ponto e vírgula</option>
+      </select>
+    </div>
+    <div class="cfg">
+      <span class="cfg-lbl">Grupo de pontos</span>
+      <select class="cfg-sel">
+        <option>Levantamento</option><option>Implantação</option><option>Controle</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="btn btn-green" ${ok?'':'disabled'} onclick="irParaExportar()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+    Continuar para exportar
+  </button>`;
+}
+
+function trocarCampo(col, campo) {
+  if (!['ignore','desc'].includes(campo)) {
+    for (const c in S.mapeamento)
+      if (S.mapeamento[c] === campo && parseInt(c) !== col) S.mapeamento[c] = 'ignore';
+  }
+  S.mapeamento[col] = campo;
+  render();
+}
+
+function irParaExportar() {
+  S.step = 2; render();
+}
+
+// ─────────────────────────────────────────
+// STEP 2 — EXPORTAR (com email gate)
+// ─────────────────────────────────────────
+function renderExportar() {
+  return `
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <h2 style="font-family:var(--disp);font-size:20px;font-weight:800;letter-spacing:-.6px;">Exportar para Civil 3D</h2>
+      <p style="font-size:12px;color:var(--muted);margin-top:3px;">${S.totalLinhas} pontos prontos · LandXML + XYZ + CSV</p>
+    </div>
+    <button class="btn-sm" onclick="irStep(1)">← Voltar</button>
+  </div>
+
+  <div class="card">
+    <div class="eg-title">Quase lá — informe seu email</div>
+    <div class="eg-sub">Para receber atualizações e enviarmos o link de download caso algo dê errado.</div>
+    <div class="eg-row">
+      <input class="eg-inp" id="email-inp" type="email" placeholder="seu@email.com" value="${S.email}">
+      <button class="btn btn-green" style="width:auto;padding:9px 20px;" onclick="confirmarEmail()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+        Confirmar
+      </button>
+    </div>
+    <div id="email-msg" style="margin-top:8px;"></div>
+  </div>
+
+  <div id="export-area" style="${S.email?'':'opacity:.4;pointer-events:none'}">
+    <div class="cfg-grid" style="margin-bottom:16px;">
+      <div class="cfg">
+        <span class="cfg-lbl">Nome do projeto</span>
+        <input class="cfg-inp" id="exp-nome" type="text" value="${S.nomeProjeto}">
+      </div>
+      <div class="cfg">
+        <span class="cfg-lbl">Pacote de saída</span>
+        <select class="cfg-sel" id="exp-pkg">
+          <option value="completo">Completo (XML + XYZ + CSV)</option>
+          <option value="csv">Só CSV CogoPoints</option>
+          <option value="landxml">Só LandXML</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-green" id="exp-btn" onclick="exportar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Gerar e baixar pacote .zip
+    </button>
+    <div id="exp-msg" style="margin-top:10px;"></div>
+  </div>`;
+}
+
+function confirmarEmail() {
+  const inp = document.getElementById('email-inp');
+  const email = inp?.value.trim();
+  if (!email || !email.includes('@')) {
+    inp.classList.add('error');
+    document.getElementById('email-msg').innerHTML = `<div class="banner b-err" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>Email inválido</div>`;
+    return;
+  }
+  inp.classList.remove('error');
+  S.email = email;
+
+  // Salva email no servidor em background
+  fetch('/api/email', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({email, nome: S.nomeProjeto}),
+  }).catch(() => {});
+
+  document.getElementById('email-msg').innerHTML = `<div class="banner b-ok" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>Email confirmado!</div>`;
+  document.getElementById('export-area').style.opacity = '1';
+  document.getElementById('export-area').style.pointerEvents = 'auto';
+}
+
+async function exportar() {
+  const btn = document.getElementById('exp-btn');
+  const msg = document.getElementById('exp-msg');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">⟳</span> Gerando pacote...';
+  msg.innerHTML = '';
+
+  S.nomeProjeto = document.getElementById('exp-nome')?.value || S.nomeProjeto;
+
+  const fd = new FormData();
+  fd.append('texto', await getTexto());
+  fd.append('nome_projeto', S.nomeProjeto);
+  fd.append('email', S.email);
+  fd.append('mapeamento', JSON.stringify(S.mapeamento));
+
+  try {
+    const res = await fetch('/api/converter', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.erro || 'Erro na conversão');
+    }
+    S.nPontos = parseInt(res.headers.get('X-Pontos') || '0');
+
+    // Download automático
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${S.nomeProjeto.replace(/ /g,'_')}_civil3d.zip`; a.click();
+    URL.revokeObjectURL(url);
+
+    S.step = 3; render();
+  } catch(e) {
+    msg.innerHTML = `<div class="banner b-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>${e.message}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Tentar novamente`;
+  }
+}
+
+// Texto em memória (foi detectado via API)
+let _textoCache = '';
+async function getTexto() {
+  return _textoCache;
+}
+
+// Override: guarda texto antes de detectar
+const _origEnviar = enviarArquivo;
+window.enviarArquivo = async function(file) {
+  const raw = await file.arrayBuffer();
+  const bytes = new Uint8Array(raw);
+  try { _textoCache = new TextDecoder('utf-8').decode(bytes); }
+  catch { _textoCache = new TextDecoder('latin-1').decode(bytes); }
+  return _origEnviar(file);
+};
+
+window.analisarPaste = async function() {
+  _textoCache = document.getElementById('paste-ta')?.value.trim() || '';
+  S.nomeProjeto = document.getElementById('nome-proj')?.value || S.nomeProjeto;
+  S.nomeArq = 'dados_colados.csv';
+  if (!_textoCache) return;
+  mostrarLoading('Analisando...');
+  const fd = new FormData();
+  fd.append('texto', _textoCache);
+  try {
+    const res = await fetch('/api/detectar', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.erro) { mostrarErro(data.erro); return; }
+    aplicarDeteccao(data);
+  } catch(e) { mostrarErro('Erro de conexão.'); }
+};
+
+// ─────────────────────────────────────────
+// STEP 3 — PRONTO + FEEDBACK
+// ─────────────────────────────────────────
+function renderPronto() {
+  const n = S.nPontos || S.totalLinhas;
+  const safe = S.nomeProjeto.replace(/ /g,'_');
+  const tris = Math.max(0, n*2-2);
+  const kb = Math.round(n*.08);
+
+  return `
+  <div style="text-align:center;padding:16px 0 24px;">
+    <div style="width:52px;height:52px;background:var(--glight);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2 style="font-family:var(--disp);font-size:24px;font-weight:800;letter-spacing:-.8px;margin-bottom:6px;">Download iniciado!</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:28px;">${n} pontos · ${tris} triângulos TIN · pacote Civil 3D</p>
+  </div>
+
+  <div class="result-files">
+    <div class="rf"><span class="rf-badge bx">XML</span><div style="flex:1"><div class="rf-name">${safe}_civil3d.xml</div><div class="rf-desc">LandXML · CogoPoints + Superfície TIN</div></div><span class="rf-stat">${tris} triângs</span></div>
+    <div class="rf"><span class="rf-badge by">XYZ</span><div style="flex:1"><div class="rf-name">${safe}_nuvem.xyz</div><div class="rf-desc">Point Cloud · importa direto no Civil 3D</div></div><span class="rf-stat">${n} pts</span></div>
+    <div class="rf"><span class="rf-badge bc">CSV</span><div style="flex:1"><div class="rf-name">${safe}_cogopoints.csv</div><div class="rf-desc">CogoPoints backup</div></div><span class="rf-stat">${kb} KB</span></div>
+  </div>
+
+  <!-- FEEDBACK -->
+  <div class="card">
+    <div class="card-title">Como foi? (30 segundos)</div>
+    <div class="card-sub">Sua resposta define o que construímos na próxima semana.</div>
+
+    <div class="stars" id="stars">
+      ${[1,2,3,4,5].map(v=>`<span class="star ${v<=S.nota?'on':''}" data-v="${v}">★</span>`).join('')}
+    </div>
+
+    <div class="fb-grid">
+      <div class="cfg">
+        <span class="cfg-lbl">Equipamento que você usa</span>
+        <select class="cfg-sel" id="fb-equip">
+          <option value="">Selecione...</option>
+          <option>Leica</option><option>Trimble</option><option>Topcon</option>
+          <option>Sokkia</option><option>GNSS RTK próprio</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="cfg">
+        <span class="cfg-lbl">A conversão ficou correta?</span>
+        <select class="cfg-sel" id="fb-ok">
+          <option value="">Selecione...</option>
+          <option value="sim">Sim, perfeito</option>
+          <option value="parcial">Parcialmente</option>
+          <option value="nao">Não funcionou</option>
+        </select>
+      </div>
+    </div>
+
+    <textarea class="fb-ta" id="fb-coment" placeholder="O que faltou? O que funcionou bem? Qualquer comentário ajuda..."></textarea>
+
+    <button class="btn btn-green" id="fb-btn" onclick="enviarFeedback()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="16" height="16"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+      Enviar feedback
+    </button>
+    <div id="fb-msg" style="margin-top:8px;"></div>
+  </div>
+
+  <button class="btn btn-dark" style="margin-top:12px;" onclick="novaConversao()">
+    Converter outro arquivo
+  </button>`;
+}
+
+async function enviarFeedback() {
+  const btn = document.getElementById('fb-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">⟳</span> Enviando...';
+  await fetch('/api/feedback', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      email: S.email,
+      equipamento: document.getElementById('fb-equip')?.value,
+      converteu: document.getElementById('fb-ok')?.value,
+      nota: S.nota,
+      comentario: document.getElementById('fb-coment')?.value,
+    }),
+  }).catch(()=>{});
+  document.getElementById('fb-msg').innerHTML = `<div class="banner b-ok" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>Obrigado! Seu feedback foi registrado.</div>`;
+  btn.innerHTML = '✓ Enviado!';
+}
+
+function novaConversao() {
+  S.step=0; S.texto=''; S.email=''; S.nota=0; _textoCache='';
+  render();
+}
+
+// init
+render();
+</script>
+</body>
+</html>
