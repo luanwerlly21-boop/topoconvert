@@ -281,11 +281,24 @@ def gerar_zip(pontos: List[Ponto], nome: str) -> bytes:
     safe = nome.replace(" ","_")
     buf = io.BytesIO()
     tris = triangular(pontos)
+    readme = (
+        f"TOPOCONVERT - PACOTE CIVIL 3D\n"
+        f"Projeto: {nome} | Pontos: {len(pontos)} | Triangulos: {len(tris)}\n\n"
+        f"ARQUIVOS:\n"
+        f"  {safe}_civil3d.xml      -> Import LandXML no Civil 3D\n"
+        f"  {safe}_nuvem.xyz        -> Attach Point Cloud\n"
+        f"  {safe}_cogopoints.csv   -> Import Points (formato PNEZD)\n\n"
+        f"COMO IMPORTAR O XML:\n"
+        f"  1. Civil 3D > Insert > Import LandXML\n"
+        f"  2. Browse > selecione {safe}_civil3d.xml\n"
+        f"  3. Se nao aparecer: mude 'Files of type' para All Files (*.*)\n"
+        f"  4. Clique Open > OK\n"
+    )
     with zipfile.ZipFile(buf,"w",zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"{safe}_civil3d.xml",  exportar_landxml(pontos, nome))
-        zf.writestr(f"{safe}_nuvem.xyz",    exportar_xyz(pontos))
+        zf.writestr(f"{safe}_civil3d.xml",    exportar_landxml(pontos, nome))
+        zf.writestr(f"{safe}_nuvem.xyz",      exportar_xyz(pontos))
         zf.writestr(f"{safe}_cogopoints.csv", exportar_csv(pontos))
-        # metadados para o frontend
+        zf.writestr("LEIA-ME.txt",            readme)
         meta = {"pontos": len(pontos), "triangulos": len(tris), "nome": nome}
         zf.writestr("_meta.json", json.dumps(meta))
     return buf.getvalue()
